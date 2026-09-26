@@ -4,8 +4,7 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 import { ArrowUp, Bot, Mic, ShieldCheck, SquareTerminal as TerminalSquare, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const OLLAMA_URL = 'http://localhost:11434/api/generate'
-const MODEL = 'qwen2.5:1.5b'
+const CHAT_ENDPOINT = '/api/chat'
 
 type Message = {
   id: string
@@ -14,7 +13,7 @@ type Message = {
 }
 
 const INITIAL_MESSAGES: Message[] = [
-  { id: 'system-boot', role: 'system', content: 'System operational. Local Ollama core engine ready.' },
+  { id: 'system-boot', role: 'system', content: 'System operational. Ollama core with OpenAI fallback ready.' },
 ]
 
 export function ChatEngine({ temporaryChat }: { temporaryChat: boolean }) {
@@ -39,14 +38,14 @@ export function ChatEngine({ temporaryChat }: { temporaryChat: boolean }) {
     setIsLoading(true)
 
     try {
-      const response = await fetch(OLLAMA_URL, {
+      const response = await fetch(CHAT_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: MODEL, prompt: userInput, stream: false }),
+        body: JSON.stringify({ prompt: userInput }),
       })
       if (!response.ok) {
         const detail = await response.text().catch(() => '')
-        throw new Error(`Ollama responded with ${response.status}. ${detail}`.trim())
+        throw new Error(`Chat service responded with ${response.status}. ${detail}`.trim())
       }
       const data: { response?: string } = await response.json()
       setMessages((prev) => [
@@ -55,11 +54,9 @@ export function ChatEngine({ temporaryChat }: { temporaryChat: boolean }) {
       ])
     } catch (error) {
       const message =
-        error instanceof TypeError
-          ? `Could not reach Ollama at ${OLLAMA_URL}. Make sure it is running and allows this origin (set OLLAMA_ORIGINS="*" and restart "ollama serve").`
-          : error instanceof Error
-            ? error.message
-            : 'Unknown error contacting Ollama.'
+        error instanceof Error
+          ? error.message
+          : 'Unknown error contacting chat service.'
       setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'error', content: message }])
     } finally {
       setIsLoading(false)
@@ -80,7 +77,7 @@ export function ChatEngine({ temporaryChat }: { temporaryChat: boolean }) {
       <header className="flex items-center justify-between border-b border-border px-6 py-4">
         <div>
           <h1 className="text-lg font-semibold text-balance">Cyber AI Chat Engine</h1>
-          <p className="font-mono text-xs text-muted-foreground">model: {MODEL}</p>
+          <p className="font-mono text-xs text-muted-foreground">model: ollama · openai fallback</p>
         </div>
         <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 font-mono text-xs text-primary">
           local
@@ -165,7 +162,7 @@ export function ChatEngine({ temporaryChat }: { temporaryChat: boolean }) {
             </button>
           </div>
           <p className="mt-2 text-center font-mono text-[11px] text-muted-foreground">
-            {'Enter to send · Shift + Enter for new line · POST → localhost:11434'}
+            {'Enter to send · Shift + Enter for new line · Ollama → OpenAI fallback'}
           </p>
         </form>
       </div>
@@ -227,7 +224,7 @@ function ThinkingIndicator() {
             />
           ))}
         </div>
-        <span className="font-mono text-xs text-muted-foreground">Ollama core is thinking...</span>
+        <span className="font-mono text-xs text-muted-foreground">AI core is thinking...</span>
       </div>
     </div>
   )
